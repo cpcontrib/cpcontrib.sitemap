@@ -12,7 +12,6 @@ namespace CPContrib.SiteMap.Templates
 	using CrownPeak.CMSAPI.CustomLibrary;
 	using CPContrib.SiteMap;
 	using System.Text.RegularExpressions;
-	using CPContrib.Core;
 
 	public class SitemapInputOptions
 	{
@@ -38,30 +37,45 @@ namespace CPContrib.SiteMap.Templates
 			return panels.Select(_ => int.Parse(_.Raw["exclude_template_list"])).ToList();
 		}
 
-		public IEnumerable<Tuple<string, string>> ParseOverrides(PanelEntry source)
+		public IEnumerable<Override> GetOverrides(PanelEntry panel)
 		{
-			string input = source.Raw["overrides"];
+			var input = panel.Raw["overrides"].Replace("\r\n", "\n").Split('\n');
 
 			return _ParseOverrides(input);
 		}
 
-		internal IEnumerable<Tuple<string,string>> _ParseOverrides(string input)
+		internal IEnumerable<Override> _ParseOverrides(string[] input)
 		{
-			var parsedOverrides = new List<Tuple<string, string>>();
+			var parsedOverrides = new List<Override>();
 
 			Regex r = new Regex(@"(.*)\s=>\s(.*)");
-			string[] overrides_values = input.Replace("\r\n", "\n").Split('\n');
 
-			foreach(var override_value in overrides_values)
+			foreach(var line in input)
 			{
-				var m = r.Match(override_value);
+				var m = r.Match(line);
 				if(m.Success)
 				{
-					parsedOverrides.Add(new Tuple<string, string>(m.Groups[1].Value, m.Groups[2].Value));
+					var overrideEntry = new Override()
+					{
+						PathSpec = m.Groups[1].Value,
+						PathSpecRegex = SitemapUtils.PathspecToRegex(m.Groups[1].Value),
+						OverrideProperties = (CPContrib.SiteMap.Serialization.@override)Util.DeserializeDataContractJson(m.Groups[2].Value, typeof(CPContrib.SiteMap.Serialization.@override))
+					};
+					parsedOverrides.Add(overrideEntry);
 				}
 			}
 
 			return parsedOverrides;
+		}
+
+		public IEnumerable<Regex> GetIgnoredPaths(PanelEntry siteroot_panel)
+		{
+			var regex_list =
+				siteroot_panel.Raw["ignored_paths"]
+				.Replace("\r\n", "\n").Split('\n')
+				.Select(_ => CPContrib.SiteMap.SitemapUtils.PathspecToRegex(_)).ToArray();
+
+			return regex_list;
 		}
 
 		/// <summary>
@@ -359,7 +373,7 @@ namespace CPContrib.SiteMap.Templates
 			return writer.ToString();
 		}
 
-		public IEnumerable<CPContrib.SiteMap.UrlBuilder> ProcessList(Status currentStatus, IEnumerable<Asset> list, IEnumerable<Regex> ignoredPaths, IEnumerable<Func<Asset, bool>> pipelineFunc = null)
+		public IEnumerable<CPContrib.SiteMap.UrlBuilder> ProcessList(Status currentStatus, IEnumerable<Asset> list, IEnumerable<Regex> ignoredPaths, IEnumerable<Override> overrides, IEnumerable<Func<Asset, bool>> pipelineFunc = null)
 		{
 			var sitemapList = new List<CPContrib.SiteMap.UrlBuilder>();
 
@@ -402,6 +416,8 @@ namespace CPContrib.SiteMap.Templates
 
 					string link = currentAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
 
+					var overrideEntry = GetOverrideEntry(overrides, currentAsset.AssetPath.ToString());
+
 					if(!string.IsNullOrEmpty(link))
 					{
 						url.Loc = link;
@@ -415,6 +431,16 @@ namespace CPContrib.SiteMap.Templates
 			}
 
 			return sitemapList;
+		}
+
+		protected virtual Override GetOverrideEntry(IEnumerable<Override> overrideCollection, string assetpath)
+		{
+			foreach(var overrideEntry in overrideCollection)
+			{
+				if(overrideEntry.PathSpecRegex.IsMatch(assetpath)) return overrideEntry;
+			}
+
+			return null;
 		}
 
 		protected virtual void _AssignProperties(UrlBuilder url)

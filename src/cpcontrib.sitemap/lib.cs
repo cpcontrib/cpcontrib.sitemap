@@ -101,12 +101,15 @@ namespace CPContrib.SiteMap
 
 
 	}
+
+
 }
 
 /***packed_BOF:UrlBuilder.cs***/
 namespace CPContrib.SiteMap
 {
 	using System.Runtime.Serialization;
+	using System.Text.RegularExpressions;
 
 	public class UrlBuilder
 	{
@@ -136,13 +139,11 @@ namespace CPContrib.SiteMap
 		}
 	}
 
-	[DataContract]
-	public class SitemapOverride
+	public class Override
 	{
-		[DataMember]
-		public string changefreq { get; set; }
-		[DataMember]
-		public float priority { get; set; }
+		public string PathSpec { get; set; }
+		public Regex PathSpecRegex { get; set; }
+		public CPContrib.SiteMap.Serialization.@override OverrideProperties { get; set; }
 	}
 
 
@@ -153,7 +154,6 @@ namespace CPContrib.SiteMap
 {
 	using System.Text.RegularExpressions;
 	using Constants = CPContrib.SiteMap.SitemapConstants; //removes an ambiguity that might arise from using another namespace
-	using IFieldAccessor = CPContrib.Core.FieldAccessors.IFieldAccessor;
 
 	public static class SitemapConstants
 	{
@@ -191,7 +191,7 @@ namespace CPContrib.SiteMap
 		/// <param name="source">an asset or panel to read values from</param>
 		/// <param name="field">field to read</param>
 		/// <returns></returns>
-		public SitemapBuilder AddIgnoredPaths(IFieldAccessor source, string field = Constants.FieldNames.SitemapInput_IgnoredPaths)
+		public SitemapBuilder AddIgnoredPaths(CrownPeak.CMSAPI.CustomLibrary.IFieldAccessor source, string field = Constants.FieldNames.SitemapInput_IgnoredPaths)
 		{
 			var ignoredPathsRegexArray =
 				source.Raw[field].Replace("\r\n", "\n").Split('\n')
@@ -314,7 +314,8 @@ namespace CPContrib.SiteMap
 	{
 		Unspecified = 0,
 		Daily = 1,
-		Monthly = 2
+		Weekly = 2,
+		Monthly = 3
 	}
 }
 
@@ -325,6 +326,15 @@ namespace CPContrib.SiteMap.Serialization
 {
 	using System.Runtime.Serialization;
 	using System.ComponentModel;
+
+	[DataContract]
+	public class @override
+	{
+		[DataMember]
+		public string changefreq { get; set; }
+		[DataMember]
+		public float priority { get; set; }
+	}
 
 	/// <summary>
 	/// url element is a child of urlset
