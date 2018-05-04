@@ -43,24 +43,51 @@ namespace CPContrib.SiteMap
 			return new Regex(regexstr, RegexOptions.IgnoreCase);
 		}
 
-		public static string[] FilterComments(string[] lines)
+		/// <summary>
+		/// Attempts to return count of items from a given IEnumerable collection.  Returns -1 if unable to determine
+		/// </summary>
+		/// <param name="source"></param>
+		/// <returns></returns>
+		public static int SafeCount(System.Collections.IEnumerable source, int defaultCount = -1)
 		{
-			string[] linesProcessed = new string[lines.Length];
-
-			for(int index = 0; index < lines.Length; index++)
+			if(source.GetType().IsArray)
 			{
-				var line = lines[index];
-				int indexOfComment = line.IndexOf("#");
+				Array sourcearray = source as Array;
+				return sourcearray.Length;
+			}
+
+			System.Collections.ICollection collection = source as System.Collections.ICollection;
+			if(collection != null)
+			{
+				return collection.Count;
+			}
+
+			//unable to determine if safe to count
+			return defaultCount;
+		}
+
+		public static IEnumerable<string> FilterComments(IEnumerable<string> lines)
+		{
+			//int linecount = SitemapUtils.SafeCount(lines);
+			int linecount = 10;
+			List<string> retval = new List<string>(linecount);
+
+			foreach(var lineOrig in lines)
+			{
+				string line = lineOrig;
+
+				int indexOfComment = lineOrig.IndexOf("#");
 
 				if(indexOfComment > 1)
-					line = line.Substring(0, indexOfComment - 1);
+					line = lineOrig.Substring(0, indexOfComment - 1);
 				else if(indexOfComment == 0)
 					line = "";
 
-				linesProcessed[index] = line;
+				retval.Add(line);
+				//yield return line;
 			}
 
-			return linesProcessed;
+			return retval;
 		}
 
 		public static IEnumerable<TemplateRef> GetTemplateRefs(string[] templatePaths)
@@ -99,7 +126,22 @@ namespace CPContrib.SiteMap
 			fp.Add(AssetPropertyNames.TemplateId, Comparison.NotInSet, templateRefs.ToList());
 		}
 
+		/// <summary>
+		/// Splits the input into an IEnumerable&lt;string&gt;
+		/// </summary>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		internal static IEnumerable<string> SplitMultilineInput(string value, bool filterComments = true)
+		{
+			IEnumerable<string> split = value.Replace("\r\n", "\n").Split('\n');
 
+			if(filterComments)
+			{
+				split = SitemapUtils.FilterComments(split);
+			}
+
+			return split;
+		}
 	}
 
 
@@ -139,11 +181,11 @@ namespace CPContrib.SiteMap
 		}
 	}
 
-	public class Override
+	public class UrlMetaEntry
 	{
 		public string PathSpec { get; set; }
 		public Regex PathSpecRegex { get; set; }
-		public CPContrib.SiteMap.Serialization.@override OverrideProperties { get; set; }
+		public CPContrib.SiteMap.Serialization.UrlMeta Meta { get; set; }
 	}
 
 
@@ -161,7 +203,7 @@ namespace CPContrib.SiteMap
 		{
 			//these would be used in various asset templates
 			public const string Sitemap_Priority = "!sitemap_priority";
-			public const string Sitemap_ChangeFrequency = "!sitemap_changefreq";
+			public const string Sitemap_ChangeFreq = "!sitemap_changefreq";
 			public const string Sitemap_Include = "!sitemap_include";
 
 			//used by Sitemap.Input template
@@ -194,7 +236,7 @@ namespace CPContrib.SiteMap
 		public SitemapBuilder AddIgnoredPaths(CrownPeak.CMSAPI.CustomLibrary.IFieldAccessor source, string field = Constants.FieldNames.SitemapInput_IgnoredPaths)
 		{
 			var ignoredPathsRegexArray =
-				source.Raw[field].Replace("\r\n", "\n").Split('\n')
+				SitemapUtils.SplitMultilineInput(source.Raw[field])
 				.Select(_ => CPContrib.SiteMap.SitemapUtils.PathspecToRegex(_)).ToArray();
 
 			this._IgnoredPaths.AddRange(ignoredPathsRegexArray);
@@ -223,8 +265,8 @@ namespace CPContrib.SiteMap
 				fieldnames = fp.FieldNames = new List<string>();
 			}
 
-			if(fieldnames.Contains(Constants.FieldNames.Sitemap_ChangeFrequency) == false)
-				fieldnames.Add(Constants.FieldNames.Sitemap_ChangeFrequency);
+			if(fieldnames.Contains(Constants.FieldNames.Sitemap_ChangeFreq)==false)
+				fieldnames.Add(Constants.FieldNames.Sitemap_ChangeFreq);
 			if(fieldnames.Contains(Constants.FieldNames.Sitemap_Priority) == false)
 				fieldnames.Add(Constants.FieldNames.Sitemap_Priority);
 
@@ -328,7 +370,7 @@ namespace CPContrib.SiteMap.Serialization
 	using System.ComponentModel;
 
 	[DataContract]
-	public class @override
+	public class UrlMeta
 	{
 		[DataMember]
 		public string changefreq { get; set; }

@@ -5,6 +5,9 @@ using System.Text;
 using CrownPeak.CMSAPI;
 using CrownPeak.CMSAPI.Services;
 /* Some Namespaces are not allowed. */
+//using TemplateRef = CrownPeak.CMSAPI.CustomLibrary.TemplateRef;
+using TemplateRef = CPContrib.Core.TemplateRef;
+
 #region Template:Sitemap
 
 namespace CPContrib.SiteMap.Templates
@@ -37,16 +40,23 @@ namespace CPContrib.SiteMap.Templates
 			return panels.Select(_ => int.Parse(_.Raw["exclude_template_list"])).ToList();
 		}
 
-		public IEnumerable<Override> GetOverrides(PanelEntry panel)
+		public IEnumerable<UrlMetaEntry> GetOverrides(PanelEntry panel)
 		{
-			var input = panel.Raw["overrides"].Replace("\r\n", "\n").Split('\n');
+			var input = SitemapUtils.SplitMultilineInput(panel.Raw["sm_overrides"]);
 
 			return _ParseOverrides(input);
 		}
 
-		internal IEnumerable<Override> _ParseOverrides(string[] input)
+		public IEnumerable<UrlMetaEntry> GetDefaults(PanelEntry panel)
 		{
-			var parsedOverrides = new List<Override>();
+			var input = SitemapUtils.SplitMultilineInput(panel.Raw["sm_defaults"]);
+
+			return _ParseOverrides(input);
+		}
+
+		internal IEnumerable<UrlMetaEntry> _ParseOverrides(IEnumerable<string> input)
+		{
+			var parsedOverrides = new List<UrlMetaEntry>();
 
 			Regex r = new Regex(@"(.*)\s=>\s(.*)");
 
@@ -55,11 +65,11 @@ namespace CPContrib.SiteMap.Templates
 				var m = r.Match(line);
 				if(m.Success)
 				{
-					var overrideEntry = new Override()
+					var overrideEntry = new UrlMetaEntry()
 					{
 						PathSpec = m.Groups[1].Value,
 						PathSpecRegex = SitemapUtils.PathspecToRegex(m.Groups[1].Value),
-						OverrideProperties = (CPContrib.SiteMap.Serialization.@override)Util.DeserializeDataContractJson(m.Groups[2].Value, typeof(CPContrib.SiteMap.Serialization.@override))
+						Meta = (CPContrib.SiteMap.Serialization.UrlMeta)Util.DeserializeDataContractJson(m.Groups[2].Value, typeof(CPContrib.SiteMap.Serialization.UrlMeta))
 					};
 					parsedOverrides.Add(overrideEntry);
 				}
@@ -68,11 +78,15 @@ namespace CPContrib.SiteMap.Templates
 			return parsedOverrides;
 		}
 
+		/// <summary>
+		/// Retrieves ignored paths from 'ignored_paths' field
+		/// </summary>
+		/// <param name="siteroot_panel"></param>
+		/// <returns></returns>
 		public IEnumerable<Regex> GetIgnoredPaths(PanelEntry siteroot_panel)
 		{
-			var regex_list =
-				siteroot_panel.Raw["ignored_paths"]
-				.Replace("\r\n", "\n").Split('\n')
+			var regex_list = 
+				SitemapUtils.SplitMultilineInput(siteroot_panel.Raw["ignored_paths"])
 				.Select(_ => CPContrib.SiteMap.SitemapUtils.PathspecToRegex(_)).ToArray();
 
 			return regex_list;
@@ -88,28 +102,70 @@ namespace CPContrib.SiteMap.Templates
 		/// ]]></code>
 		/// </example>
 		public static void ShowSiteMapInput(bool isConfig = false, SitemapInputOptions options = null)
+        {
+            Input.StartControlPanel("SiteMap Controls");
+            Dictionary<string, string> Priorities = new Dictionary<string, string>();
+            Dictionary<string, string> Frequency = new Dictionary<string, string>();
+            Input.ShowHeader("XML Site Map", null, null, false);
+            if (!isConfig)
+            {
+                Priorities.Add("Global Default", "default");
+                Frequency.Add("Global Default", "default");
+                ServicesInput.populateDictionaries(Priorities, Frequency);
+                Input.ShowMessage("<strong>Used when compiling XML Sitemaps</strong>.  Changes override Global Configuration defaults.", null, null);
+                bool? nullable = null;
+                Input.ShowCheckBox("Exclude", "!sitemap_exclude", "true", "Check to exclude this page from XML Sitemap.", "", "", nullable, "", false);
+                Input.ShowDropDown("Priority", "!sitemap_priority", Priorities, Util.MakeList(new string[] { "default" }), -1, false, "Set only if you wish to override default.", "");
+                Input.ShowDropDown("Change Frequency", "!sitemap_changefreq", Frequency, Util.MakeList(new string[] { "default" }), -1, false, "Set only if you wish to override default.", "");
+            }
+            else
+            {
+                Input.ShowMessage("<strong>XML Site Map</strong> - used when compiling XML sitemaps.  This panel sets Global Configuration defaults.", null, null);
+                ServicesInput.populateDictionaries(Priorities, Frequency);
+                Input.ShowDropDown("Priority", "!sitemap_priority", Priorities, Util.MakeList(new string[] { "0.5" }), -1, false, "Select Default Priority.", "");
+                Input.ShowDropDown("Change Frequency", "!sitemap_changefreq", Frequency, Util.MakeList(new string[] { "unspecified" }), -1, false, "Select Default Change Frequency.", "");
+            }
+            Input.EndControlPanel();
+        }
+
+		public void OnInput()
 		{
-			Input.StartControlPanel("SiteMap Controls");
-			Dictionary<string, string> Priorities = new Dictionary<string, string>();
-			Dictionary<string, string> Frequency = new Dictionary<string, string>();
-			Input.ShowHeader("XML Site Map", null, null, false);
-			if(!isConfig)
+			Input.StartControlPanel("Sitemap");
 			{
-				Priorities.Add("Global Default", "default");
-				Frequency.Add("Global Default", "default");
-				ServicesInput.populateDictionaries(Priorities, Frequency);
-				Input.ShowMessage("<strong>Used when compiling XML Sitemaps</strong>.  Changes override Global Configuration defaults.", null, null);
-				bool? nullable = null;
-				Input.ShowCheckBox("Exclude", "!sitemap_exclude", "true", "Check to exclude this page from XML Sitemap.", "", "", nullable, "", false);
-				Input.ShowDropDown("Priority", "!sitemap_priority", Priorities, Util.MakeList(new string[] { "default" }), -1, false, "Set only if you wish to override default.", "");
-				Input.ShowDropDown("Change Frequency", "!sitemap_changefreq", Frequency, Util.MakeList(new string[] { "default" }), -1, false, "Set only if you wish to override default.", "");
-			}
-			else
-			{
-				Input.ShowMessage("<strong>XML Site Map</strong> - used when compiling XML sitemaps.  This panel sets Global Configuration defaults.", null, null);
-				ServicesInput.populateDictionaries(Priorities, Frequency);
-				Input.ShowDropDown("Priority", "!sitemap_priority", Priorities, Util.MakeList(new string[] { "0.5" }), -1, false, "Select Default Priority.", "");
-				Input.ShowDropDown("Change Frequency", "!sitemap_changefreq", Frequency, Util.MakeList(new string[] { "unspecified" }), -1, false, "Select Default Change Frequency.", "");
+				while(Input.NextPanel("sitemap_roots"))
+				{
+
+					Input.ShowTextBox("Sitemap Name", "sitemap_name", "sitemap", helpMessage: "Must use different name if included within a sitemap index file.");
+
+					Input.ShowTextBox("Root Folder", "sitemap_root", helpMessage: "Enter the root folder to build a sitemap");
+
+					var sitemapinput = new CPContrib.SiteMap.Templates.Sitemap_Input(asset);
+					sitemapinput.CreateExcludeTemplateList();
+
+					//Input.ShowTextBox("Ignored Templates", "ignored_templates", height: 9);
+
+					const string SUPPORTS_COMMENTS = "Supports comments starting with '#', rest of line is ignored.";
+					const string EXAMPLE_SPEC = "Example: /Folder/subfolder/* => { \"changefreq\":\"monthly\", \"priority\":0.5 }";
+
+					Input.ShowTextBox("Ignored paths:", "ignored_paths", height: 5,
+						helpMessage: String.Join("\n", "Example: /Folder/subfolder/*", SUPPORTS_COMMENTS)
+					);
+
+					Input.ShowTextBox("Defaults:", "sm_defaults", height: 5,
+						helpMessage: String.Join("\n", EXAMPLE_SPEC, SUPPORTS_COMMENTS),
+						popupMessage: "Defaults are used when asset doesnt have any sitemap meta-data specified.  Defaults are applied first.");
+
+					Input.ShowTextBox("Overrides:", "sm_overrides", height: 5,
+						helpMessage: String.Join("\n", EXAMPLE_SPEC, SUPPORTS_COMMENTS),
+						popupMessage: "Overrides are applied last.");
+					//Each override is a pathspec separated by ' => ' with a json object: { changefreq: 'monthly', priority: 0.5 } ");
+				}
+
+				if(asset["sitemap_usedbyindex"] != "")
+				{
+					Input.ShowMessage("This sitemap is being used by a sitemapindex");
+					Input.ShowLink(Asset.Load(asset["sitemap_usedbyindex"]));
+				}
 			}
 			Input.EndControlPanel();
 		}
@@ -136,14 +192,14 @@ namespace CPContrib.SiteMap.Templates
 
 			var entries = new Dictionary<string, string>(templates.Count);
 
-			foreach(var tpl in templates.OrderBy(_ => _.AssetPath.ToString()))
+			foreach(var tpl in templates.OrderBy(_=>_.AssetPath.ToString()))
 			{
 				string title = string.Format("{0} ({1})", tpl.Label, tpl.AssetPath.GetParent());
 				entries.Add(title, tpl.Id.ToString());
-
+				
 			}
 
-			Input.ShowSelectList("Exclude Templates", "exclude_template_list", entries, size: 10);
+			Input.ShowSelectList("Exclude Templates", "exclude_template_list", entries, size:10);
 		}
 
 		#region PostInput
@@ -160,27 +216,34 @@ namespace CPContrib.SiteMap.Templates
 			{
 				foreach(var panel in asset.GetPanels("sitemap_roots"))
 				{
-					var templateRefs = GetTemplateRefs(panel.Raw["exclude_templates"].Replace("\r\n", "\n").Split('\n'));
+					var templateRefs = GetTemplateRefs(panel);
 					string fieldname = panel.GetFieldName("exclude_template_ids");
 
 					asset.SaveContentField(fieldname, String.Join(",", templateRefs.Select(_ => _.TemplateId.ToString())));
 				}
-			}
+			} 
 			catch(Exception ex)
 			{
-				Util.Log(asset, "Failed to run post_save: " + ex.ToString().Replace("{", "{{"));
+				Util.Log(asset, "Failed to run post_save: " + ex.ToString().Replace("{","{{"));
 				throw;
 			}
 		}
 		#endregion
 
-		IEnumerable<TemplateRef> GetTemplateRefs(string[] paths)
+		IEnumerable<TemplateRef> GetTemplateRefs(PanelEntry panel)
+		{
+			var input = SitemapUtils.SplitMultilineInput(panel.Raw["exclude_templates"]);
+			var templateRefs = GetTemplateRefs(input);
+			return templateRefs;
+		}
+
+		IEnumerable<TemplateRef> GetTemplateRefs(IEnumerable<string> input)
 		{
 			List<TemplateRef> items = new List<TemplateRef>();
 
-			foreach(var templateidStr in SitemapUtils.FilterComments(paths))
+			foreach(var templateidStr in SitemapUtils.FilterComments(input))
 			{
-
+				
 				try
 				{
 					int templateId;
@@ -204,7 +267,7 @@ namespace CPContrib.SiteMap.Templates
 
 
 	}
-
+	
 	public class Sitemap_Output //Sitemap_Output: ITemplate_Output
 	{
 		public Sitemap_Output(Func<IList<UrlBuilder>> SitemapBuilderFunc)
@@ -294,6 +357,8 @@ namespace CPContrib.SiteMap.Templates
 		{
 			this.asset = asset;
 			this.context = context;
+			this.AssignMetaFunc = AssignMeta;
+			this.IgnoreAssetFunc = DecideIgnoreAsset;
 		}
 		Asset asset;
 		OutputContext context;
@@ -309,23 +374,22 @@ namespace CPContrib.SiteMap.Templates
 		public string GetSitemapXmlChunk(IEnumerable<UrlBuilder> sitemapList, bool isPublishing = true)
 		{
 			var writer = new XmlTextWriter(
-				new System.Xml.XmlWriterSettings()
-				{
+				new System.Xml.XmlWriterSettings() {
 					Indent = true,
 					IndentChars = "\t",
 					ConformanceLevel = System.Xml.ConformanceLevel.Fragment
 				}
 			);
 
-			//		if(WritingFull)
-			//		{
-			//			writer.WriteStartDocument(standalone: true);
+	//		if(WritingFull)
+	//		{
+	//			writer.WriteStartDocument(standalone: true);
 
-			//			//writer.WriteStartElement("urlset", "http://www.sitemaps.org/schemas/sitemap/0.9");
-			//			writer.WriteRaw(@"<urlset xmlns=""http://www.sitemaps.org/schemas/sitemap/0.9"" 
-			//xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""
-			//xsi:schemalocation=""http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"">");
-			//		}
+	//			//writer.WriteStartElement("urlset", "http://www.sitemaps.org/schemas/sitemap/0.9");
+	//			writer.WriteRaw(@"<urlset xmlns=""http://www.sitemaps.org/schemas/sitemap/0.9"" 
+	//xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""
+	//xsi:schemalocation=""http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"">");
+	//		}
 
 			foreach(var urlBuilder in sitemapList)
 			{
@@ -334,7 +398,7 @@ namespace CPContrib.SiteMap.Templates
 				writer.WriteStartElement("url");
 				{
 					writer.WriteStartElement("loc");
-					if(isPublishing == false)
+					if (isPublishing == false)
 					{
 						writer.WriteString(string.Format("CMS Path: {0}", urlBuilder.Asset.AssetPath));
 					}
@@ -373,18 +437,51 @@ namespace CPContrib.SiteMap.Templates
 			return writer.ToString();
 		}
 
-		public IEnumerable<CPContrib.SiteMap.UrlBuilder> ProcessList(Status currentStatus, IEnumerable<Asset> list, IEnumerable<Regex> ignoredPaths, IEnumerable<Override> overrides, IEnumerable<Func<Asset, bool>> pipelineFunc = null)
+		private IEnumerable<UrlMetaEntry> _defaults;
+		private IEnumerable<UrlMetaEntry> _overrides;
+		public SitemapOutputBuilder SetDefaults(IEnumerable<UrlMetaEntry> defaults)
 		{
-			var sitemapList = new List<CPContrib.SiteMap.UrlBuilder>();
+			this._defaults = defaults;
+			return this;
+		}
+		public SitemapOutputBuilder SetOverrides(IEnumerable<UrlMetaEntry> overrides)
+		{
+			this._overrides = overrides;
+			return this;
+		}
 
-			int count = 0;
-			foreach(Asset currentAsset in list)
+		List<Asset> _assets;
+		public SitemapOutputBuilder AddAssets(IEnumerable<Asset> assets)
+		{
+			if(assets != null)
 			{
-				string pathstr = currentAsset.AssetPath.ToString();
+				if(this._assets == null) _assets = new List<Asset>();
+				_assets.AddRange(assets);
+			}
+			return this;
+		}
 
-				bool ignored = false;
+		List<Regex> _ignoredPaths;
+		public SitemapOutputBuilder AddIgnoredPaths(IEnumerable<Regex> ignoredPaths)
+		{
+			if(ignoredPaths != null)
+			{
+				if(this._ignoredPaths == null) this._ignoredPaths = new List<Regex>();
+				this._ignoredPaths.AddRange(ignoredPaths);
+			}
+			return this;
+		}
 
-				foreach(var ignoredPath in ignoredPaths)
+		public Func<Asset, bool> IgnoreAssetFunc;
+		public bool DecideIgnoreAsset(Asset currentAsset)
+		{
+			string pathstr = currentAsset.AssetPath.ToString();
+
+			bool ignored = false;
+
+			if(this._ignoredPaths != null)
+			{
+				foreach(var ignoredPath in this._ignoredPaths)
 				{
 					if(ignoredPath.IsMatch(pathstr))
 					{
@@ -395,34 +492,55 @@ namespace CPContrib.SiteMap.Templates
 					}
 
 				}
-				//if (path[2] != asset.AssetPath[2])
-				//{
-				//    Out.DebugWriteLine("Ignoring asset '{0}' due to unexpected language mismatch: '{1}'.", currentAsset.AssetPath, asset.AssetPath[2]);
-				//    ignored = true;
-				//}
+			}
 
-				//FilterParams is returning items with empty workflow
-				if(currentAsset.WorkflowStatus.Name != currentStatus.Name)
-				{
-					Out.DebugWriteLine("Ignoring asset '{0}' due to differing Workflow Status: '{1}'.", currentAsset.AssetPath, currentAsset.WorkflowStatus.Name);
-					ignored = true;
-				}
+			//if (path[2] != asset.AssetPath[2])
+			//{
+			//    Out.DebugWriteLine("Ignoring asset '{0}' due to unexpected language mismatch: '{1}'.", currentAsset.AssetPath, asset.AssetPath[2]);
+			//    ignored = true;
+			//}
 
-				if(ignored == false)
+			//FilterParams is returning items with empty workflow
+			if(currentAsset.WorkflowStatus.Name != context.PublishingStatus.Name)
+			{
+				Out.DebugWriteLine("Ignoring asset '{0}' due to differing Workflow Status: '{1}'.", currentAsset.AssetPath, currentAsset.WorkflowStatus.Name);
+				ignored = true;
+			}
+
+			return ignored;
+		}
+
+		public IEnumerable<CPContrib.SiteMap.UrlBuilder> ProcessList(Status currentStatus)
+		{
+			var sitemapList = new List<CPContrib.SiteMap.UrlBuilder>();
+
+			int count = 0;
+			IEnumerable<Asset> assetList = this._assets ?? new List<Asset>();
+
+			foreach (Asset currentAsset in assetList)
+			{
+				bool ignored = this.IgnoreAssetFunc(currentAsset);
+
+				if (ignored == false)
 				{
 					var url = new CPContrib.SiteMap.UrlBuilder();
 
 					url.Asset = currentAsset;
 
-					string link = currentAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
+					string link = currentAsset.GetLink(addDomain: true, protocolType:ProtocolType.Https);
 
-					var overrideEntry = GetOverrideEntry(overrides, currentAsset.AssetPath.ToString());
-
-					if(!string.IsNullOrEmpty(link))
+					if (!string.IsNullOrEmpty(link))
 					{
 						url.Loc = link;
+						url.LastMod = url.Asset.ModifiedDate.GetValueOrDefault();
 
-						_AssignProperties(url);
+						string assetpathStr = url.Asset.AssetPath.ToString();
+
+						var defaultEntry = GetDefaultEntry(assetpathStr);
+						var overrideEntry = GetOverrideEntry(assetpathStr);
+
+						//call function assigned to AssignPropertiesFunc
+						this.AssignMetaFunc(url, defaultEntry, overrideEntry);
 
 						//add to list to output
 						sitemapList.Add(url);
@@ -433,46 +551,62 @@ namespace CPContrib.SiteMap.Templates
 			return sitemapList;
 		}
 
-		protected virtual Override GetOverrideEntry(IEnumerable<Override> overrideCollection, string assetpath)
+		protected virtual UrlMetaEntry GetDefaultEntry(string assetpath)
 		{
-			foreach(var overrideEntry in overrideCollection)
-			{
-				if(overrideEntry.PathSpecRegex.IsMatch(assetpath)) return overrideEntry;
-			}
+			return _GetEntry(this._defaults, assetpath);
+		}
 
+		protected virtual UrlMetaEntry GetOverrideEntry(string assetpath)
+		{
+			return _GetEntry(this._overrides, assetpath);
+		}
+
+		internal UrlMetaEntry _GetEntry(IEnumerable<UrlMetaEntry> sourcecollection, string assetpath)
+		{ 
+			if(sourcecollection != null)
+			{
+				foreach(var overrideEntry in sourcecollection)
+				{
+					if(overrideEntry.PathSpecRegex.IsMatch(assetpath)) return overrideEntry;
+				}
+			}
 			return null;
 		}
 
-		protected virtual void _AssignProperties(UrlBuilder url)
-		{
-			if(this.AssignProperties != null)
-			{
-				this.AssignProperties(url);
-			}
-			else
-			{
-				this.AssignPropertiesDefault(url);
-			}
-		}
-
-		public Action<UrlBuilder> AssignProperties;
-		public void AssignPropertiesDefault(UrlBuilder url)
+		public Action<UrlBuilder,UrlMetaEntry,UrlMetaEntry> AssignMetaFunc;
+		public virtual void AssignMeta(UrlBuilder url, UrlMetaEntry defaultEntry, UrlMetaEntry overrideEntry)
 		{
 			//url.priority = LmUtil.EmptyFallback(url.Asset.Raw["xmlsm_priority"], url.Asset.Raw[SitemapConstants.FieldNames.Sitemap_Priority], "");
-			url.priority = asset.Raw[SitemapConstants.FieldNames.Sitemap_Priority];
+			url.priority = url.Asset.Raw[SitemapConstants.FieldNames.Sitemap_Priority];
+
 			if(string.IsNullOrEmpty(url.priority))
 			{
-				url.priority = "0.5";
+				if(defaultEntry != null && defaultEntry.Meta != null)
+				{
+					url.priority = defaultEntry.Meta.priority.ToString("0.0");
+				}
+			}
+
+			if(overrideEntry != null && overrideEntry.Meta != null)
+			{
+				url.priority = overrideEntry.Meta.priority.ToString("0.0");
 			}
 
 			//url.changefreq = LmUtil.EmptyFallback(url.Asset.Raw["xmlsm_changefreq"], url.Asset.Raw[SitemapConstants.FieldNames.Sitemap_ChangeFrequency], "");
-			url.changefreq = url.Asset.Raw[SitemapConstants.FieldNames.Sitemap_ChangeFrequency];
-			if(string.IsNullOrEmpty(url.changefreq) || url.changefreq == "unspecified")
+			url.changefreq = url.Asset.Raw[SitemapConstants.FieldNames.Sitemap_ChangeFreq];
+
+			if(string.IsNullOrEmpty(url.changefreq))
 			{
-				url.changefreq = "weekly";
+				if(defaultEntry != null && defaultEntry.Meta != null)
+				{
+					url.changefreq = defaultEntry.Meta.changefreq;
+				}
 			}
 
-			url.LastMod = url.Asset.ModifiedDate.GetValueOrDefault();
+			if(overrideEntry != null && overrideEntry.Meta != null)
+			{
+				url.changefreq = overrideEntry.Meta.changefreq ?? "unspecified";
+			}
 		}
 
 	}
