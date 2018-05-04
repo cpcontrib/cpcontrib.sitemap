@@ -199,6 +199,8 @@ namespace CPContrib.SiteMap
 
 	public static class SitemapConstants
 	{
+		public const string Tiered_LastMod = "Tiered_LastMod";
+
 		public static class FieldNames
 		{
 			//these would be used in various asset templates

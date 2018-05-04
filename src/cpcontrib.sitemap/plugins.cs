@@ -542,6 +542,11 @@ namespace CPContrib.SiteMap.Templates
 						//call function assigned to AssignPropertiesFunc
 						this.AssignMetaFunc(url, defaultEntry, overrideEntry);
 
+						if(url.changefreq == SitemapConstants.Tiered_LastMod)
+						{
+							this.Tiered_LastMod_ChangeFreq(url);
+						}
+
 						//add to list to output
 						sitemapList.Add(url);
 					}
@@ -549,6 +554,33 @@ namespace CPContrib.SiteMap.Templates
 			}
 
 			return sitemapList;
+		}
+
+		public void Tiered_LastMod_ChangeFreq(UrlBuilder url)
+		{
+			DateTime now = DateTime.Today;
+			var span = now - url.LastMod;
+
+			if(span.TotalDays > 30)
+			{
+				url.changefreq = "monthly";
+				url.priority = "0.6";
+			}
+			else if(span.TotalDays > 7)
+			{
+				url.changefreq = "weekly";
+				url.priority = "0.7";
+			}
+			else if(span.TotalDays > 1)
+			{
+				url.changefreq = "daily";
+				url.priority = "0.8";
+			}
+			else if(span.TotalHours > 1)
+			{
+				url.changefreq = "hourly";
+				url.priority = "0.9";
+			}
 		}
 
 		protected virtual UrlMetaEntry GetDefaultEntry(string assetpath)
