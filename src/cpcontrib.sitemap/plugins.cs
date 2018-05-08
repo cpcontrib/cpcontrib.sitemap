@@ -714,13 +714,22 @@ namespace CPContrib.SiteMap.Templates
 			xsi:schemaLocation='http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/siteindex.xsd'
 			xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>");
 
+			bool forceHttps = asset.Raw["sitemap_force_https"] == "true";
+
 			foreach(var panel in asset.GetPanels("sitemap_roots"))
 			{
 				Asset sitemapAsset = Asset.Load(panel["sitemap_asset"]);
+
 				if(sitemapAsset.IsLoaded)
 				{
+					//create dependency to the sitemaproot asset specified
+					asset.AddDependencyTo(sitemapAsset);
+
 					sb.AppendLine("<sitemap>");
-					sb.AppendFormat("  <loc>{0}</loc>\n", sitemapAsset.GetLink(addDomain: true));
+
+					string loc = sitemapAsset.GetLink(addDomain: true);
+					if(forceHttps) loc = loc.Replace("http://", "https://");
+					sb.AppendFormat("  <loc>{0}</loc>\n", loc);
 
 					if(sitemapAsset.PublishDate != null)
 					{
