@@ -658,11 +658,9 @@ namespace CPContrib.SiteMap.Templates
 				sitemapAsset = Asset.Load(asset.Raw["sitemap_usedbyindex"]);
 			}
 
-			string sitemapUrl = sitemapAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
-
-
 			var Logger = new CrownPeak.CMSAPI.CustomLibrary.UtilLogLogger("SitemapsPinger", asset);
 
+			string sitemapUrl = sitemapAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
 			var sitemapsPinger = new CPContrib.SiteMap.SitemapsPinger(Logger);
 			sitemapsPinger.Ping(sitemapUrl);
 
