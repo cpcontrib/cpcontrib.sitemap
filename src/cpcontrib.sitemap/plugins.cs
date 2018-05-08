@@ -670,6 +670,30 @@ namespace CPContrib.SiteMap.Templates
 		}
 	}
 
+	public class SitemapIndex_Input // : ITemplate_Input
+	{
+		public void OnInput(Asset asset, InputContext context)
+		{
+			//generate control panel to contain List Panel and Checkbox in one panel in Volte
+			Input.StartTabbedPanel("Sitemap Roots", "Options");
+			{
+
+				while(Input.NextPanel("sitemap_roots"))
+				{
+
+					Input.ShowAcquireDocument("Included Sitemap", "sitemap_asset", helpMessage: "Select a Sitemap asset to include within the index");
+
+
+				}
+			}
+			Input.NextTabbedPanel();
+			{
+				Input.ShowCheckBox("Force HTTPS for sitemap links", "sitemap_force_https", "true", "Force HTTPS for links",
+					helpMessage: "Check this to force links generated to the sitemaps within the index to be HTTPS");
+			}
+			Input.EndTabbedPanel();
+		}
+	}
 	public class SitemapIndex_Output // : ITemplate_Output
 	{
 		public SitemapIndex_Output()
