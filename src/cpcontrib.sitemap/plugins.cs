@@ -652,19 +652,19 @@ namespace CPContrib.SiteMap.Templates
 	{
 		public void OnPostPublish(Asset asset, PostPublishContext context)
 		{
-			Asset sitemapAsset = asset;
-			if(asset.Raw["sitemap_usedbyindex"] != "")
+			using(var Logger = new CrownPeak.CMSAPI.CustomLibrary.UtilLogLogger("SitemapsPinger", asset))
 			{
-				sitemapAsset = Asset.Load(asset.Raw["sitemap_usedbyindex"]);
-			}
+				foreach(var panel in asset.GetPanels("sitemap_roots"))
+				{
+					Asset sitemapAsset = Asset.Load(panel.Raw["sitemap_asset"]);
+					sitemapAsset.Publish(publishDependencies: false);
 
-			var Logger = new CrownPeak.CMSAPI.CustomLibrary.UtilLogLogger("SitemapsPinger", asset);
+					string sitemapUrl = sitemapAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
 
-			string sitemapUrl = sitemapAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
-			var sitemapsPinger = new CPContrib.SiteMap.SitemapsPinger(Logger);
-			sitemapsPinger.Ping(sitemapUrl);
-
-			Logger.Flush();
+					var sitemapsPinger = new CPContrib.SiteMap.SitemapsPinger(Logger);
+					sitemapsPinger.Ping(sitemapUrl);
+				}
+			} //Logger.Flush();
 		}
 	}
 
@@ -692,6 +692,7 @@ namespace CPContrib.SiteMap.Templates
 			Input.EndTabbedPanel();
 		}
 	}
+
 	public class SitemapIndex_Output // : ITemplate_Output
 	{
 		public SitemapIndex_Output()
