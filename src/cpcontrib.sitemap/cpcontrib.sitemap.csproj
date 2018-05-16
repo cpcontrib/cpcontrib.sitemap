@@ -48,6 +48,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Component_SitemapMeta.cs" />
     <Compile Include="lib.cs" />
     <Compile Include="plugins.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
