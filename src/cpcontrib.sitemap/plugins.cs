@@ -314,15 +314,16 @@ namespace CPContrib.SiteMap.Templates
 
 	public class Sitemap_PostPublish // : ITemplate_PostPublish
 	{
-		private CPLog.ILogger Log;
+		private UtilLogLogger Log;
 
-		public Sitemap_PostPublish(CPLog.ILogger Logger)
+		public Sitemap_PostPublish(CPLog.ILogger Logger = null)
 		{
-			this.Log = (Logger == null ? CPLog.LogManager.GetCurrentClassLogger() : Logger);
+			//this.Log = (Logger == null ? CPLog.LogManager.GetCurrentClassLogger() : Logger);
 		}
 
 		public void OnPostPublish(Asset asset, PostPublishContext context)
 		{
+			Log = new UtilLogLogger("SiteMap_PostPublish", asset);
 			Log.Info("Beginning post_publish");
 
 			Asset sitemapAsset = asset;
@@ -333,12 +334,10 @@ namespace CPContrib.SiteMap.Templates
 
 			string sitemapUrl = sitemapAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
 
-			var Logger = new CrownPeak.CMSAPI.CustomLibrary.UtilLogLogger("SitemapsPinger", asset);
-
 			var sitemapsPinger = new CPContrib.SiteMap.SitemapsPinger(Log);
 			sitemapsPinger.Ping(sitemapUrl);
 
-			Logger.Flush();
+			Log.Flush();
 		}
 	}
 
