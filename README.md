@@ -1,7 +1,8 @@
-# cpcontrib.core
-CPContrib.Core for internal CrownPeak work
+# cpcontrib.sitemap
+CPContrib SiteMap assists in collecting and generating sitemaps per sitemap.org specifications
 
 ```
-paket install cpcontrib.core
-paket install cpcontrib.core --namespace Component_Library
+#paket source https://nuget.cp-contrib.com
+paket install cpcontrib.sitemap
+paket install cpcontrib.sitemap --namespace Component_Library
 ```
