@@ -5,9 +5,6 @@ using System.Text;
 using CrownPeak.CMSAPI;
 using CrownPeak.CMSAPI.Services;
 /* Some Namespaces are not allowed. */
-//using TemplateRef = CrownPeak.CMSAPI.CustomLibrary.TemplateRef;
-using TemplateRef = CPContrib.Core.TemplateRef;
-
 #region Template:Sitemap
 
 namespace CPContrib.SiteMap.Templates
@@ -296,7 +293,7 @@ namespace CPContrib.SiteMap.Templates
 
 			IList<UrlBuilder> result = null;
 
-			System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+			Stopwatch sw = new Stopwatch();
 			sw.Start();
 
 			try { result = SitemapBuilderFunc(); }
