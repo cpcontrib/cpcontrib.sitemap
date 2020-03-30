@@ -527,28 +527,36 @@ namespace CPContrib.SiteMap.Templates
 
 					url.Asset = currentAsset;
 
-					string link = currentAsset.GetLink(addDomain: true, protocolType:ProtocolType.Https);
-
-					if (!string.IsNullOrEmpty(link))
+					if(currentAsset.IsLoaded)
 					{
-						url.Loc = link;
-						url.LastMod = url.Asset.ModifiedDate.GetValueOrDefault();
+						//Util.Log(logAsset, "ID: " + currentAsset.Id + ToString());
+						
+						List<string> lastPubUrls = currentAsset.GetLastPublishedLinks(true, ProtocolType.Https);
+						string link = lastPubUrls.FirstOrDefault();
+						if(string.IsNullOrEmpty(link))
+							link = currentAsset.GetLink(addDomain: true, protocolType:ProtocolType.Https);
 
-						string assetpathStr = url.Asset.AssetPath.ToString();
-
-						var defaultEntry = GetDefaultEntry(assetpathStr);
-						var overrideEntry = GetOverrideEntry(assetpathStr);
-
-						//call function assigned to AssignPropertiesFunc
-						this.AssignMetaFunc(url, defaultEntry, overrideEntry);
-
-						if(url.changefreq == SitemapConstants.Tiered_LastMod)
+						if (!string.IsNullOrEmpty(link))
 						{
-							this.Tiered_LastMod_ChangeFreq(url);
-						}
+							url.Loc = link;
+							url.LastMod = url.Asset.ModifiedDate.GetValueOrDefault();
 
-						//add to list to output
-						sitemapList.Add(url);
+							string assetpathStr = url.Asset.AssetPath.ToString();
+
+							var defaultEntry = GetDefaultEntry(assetpathStr);
+							var overrideEntry = GetOverrideEntry(assetpathStr);
+
+							//call function assigned to AssignPropertiesFunc
+							this.AssignMetaFunc(url, defaultEntry, overrideEntry);
+
+							if(url.changefreq == SitemapConstants.Tiered_LastMod)
+							{
+								this.Tiered_LastMod_ChangeFreq(url);
+							}
+
+							//add to list to output
+							sitemapList.Add(url);
+						}
 					}
 				}
 			}
