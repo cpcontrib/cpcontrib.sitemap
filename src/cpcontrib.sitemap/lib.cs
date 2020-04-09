@@ -5,6 +5,8 @@ using System.Text;
 using CrownPeak.CMSAPI;
 using CrownPeak.CMSAPI.Services;
 /* Some Namespaces are not allowed. */
+using TemplateRef = CrownPeak.CMSAPI.CustomLibrary.TemplateRef;
+
 namespace /*!packer:LibraryNamespace*/CrownPeak.CMSAPI.CustomLibrary
 {
 
