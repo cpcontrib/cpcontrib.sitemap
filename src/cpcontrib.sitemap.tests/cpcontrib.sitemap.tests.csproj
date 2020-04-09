@@ -48,7 +48,7 @@
   <ItemGroup>
     <ProjectReference Include="..\cpcontrib.sitemap\cpcontrib.sitemap.csproj">
       <Project>{efc673fe-114c-4108-b2a8-b9041d30b66a}</Project>
-      <Name>cpcontrib.core</Name>
+      <Name>cpcontrib.sitemap</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
