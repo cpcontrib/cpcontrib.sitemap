@@ -349,15 +349,18 @@ namespace CPContrib.SiteMap.Templates
 
 	public class SitemapOutputBuilder
 	{
-		public SitemapOutputBuilder(Asset asset, OutputContext context)
+		public SitemapOutputBuilder(Asset asset, OutputContext context, CPLog.ILogger logger = null)
 		{
 			this.asset = asset;
 			this.context = context;
 			this.AssignMetaFunc = AssignMeta;
 			this.IgnoreAssetFunc = DecideIgnoreAsset;
+
+			if (logger != null) Log = logger;
 		}
 		Asset asset;
 		OutputContext context;
+		CPLog.ILogger Log = new CPLog.Logger("SitemapOutputBuilder");
 
 		public bool ForceHttps;
 
@@ -482,7 +485,7 @@ namespace CPContrib.SiteMap.Templates
 					if(ignoredPath.IsMatch(pathstr))
 					{
 						//ignoreList.Add(new Tuple<string, string>(currentAsset.AssetPath.ToString(), ignoredPath.ToString()));
-						Out.DebugWriteLine("Ignoring asset '{0}' due to ignored path: '{1}'.", currentAsset.AssetPath, ignoredPath);
+						Log.Debug("Ignoring asset '{0}' due to ignored path: '{1}'.", currentAsset.AssetPath, ignoredPath);
 						ignored = true;
 						continue;
 					}
@@ -499,7 +502,7 @@ namespace CPContrib.SiteMap.Templates
 			//FilterParams is returning items with empty workflow
 			if(currentAsset.WorkflowStatus.Name != context.PublishingStatus.Name)
 			{
-				Out.DebugWriteLine("Ignoring asset '{0}' due to differing Workflow Status: '{1}'.", currentAsset.AssetPath, currentAsset.WorkflowStatus.Name);
+				Log.Debug("Ignoring asset '{0}' due to differing Workflow Status: '{1}'.", currentAsset.AssetPath, currentAsset.WorkflowStatus.Name);
 				ignored = true;
 			}
 
@@ -525,7 +528,7 @@ namespace CPContrib.SiteMap.Templates
 
 					if(currentAsset.IsLoaded)
 					{
-						//Util.Log(logAsset, "ID: " + currentAsset.Id + ToString());
+						Log.Debug("Adding asset {0}", currentAsset.Id);
 						
 						List<string> lastPubUrls = currentAsset.GetLastPublishedLinks(true, ProtocolType.Https);
 						string link = lastPubUrls.FirstOrDefault();
