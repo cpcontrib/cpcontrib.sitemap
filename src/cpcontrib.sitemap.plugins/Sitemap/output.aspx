@@ -91,7 +91,7 @@
 		Out.WriteLine(@"</urlset>");
 	}
 
-	private void AssignPropertiesSpecial(CPContrib.SiteMap.UrlBuilder url, CPContrib.SiteMap.UrlMetaEntry overrideEntry)
+	private void AssignPropertiesSpecial(CPContrib.SiteMap.SitemapItem url, CPContrib.SiteMap.UrlMetaEntry overrideEntry)
 	{
 
 

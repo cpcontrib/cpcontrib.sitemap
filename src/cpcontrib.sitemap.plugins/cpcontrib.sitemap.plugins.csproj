@@ -70,11 +70,15 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="input.aspx" />
-    <Content Include="output.aspx" />
-    <Content Include="post_input.aspx" />
-    <Content Include="post_publish.aspx" />
-    <Content Include="post_save.aspx" />
+    <Content Include="SitemapIndex\filename.aspx" />
+    <Content Include="SitemapIndex\input.aspx" />
+    <Content Include="SitemapIndex\output.aspx" />
+    <Content Include="SitemapIndex\post_publish.aspx" />
+    <Content Include="Sitemap\input.aspx" />
+    <Content Include="Sitemap\output.aspx" />
+    <Content Include="Sitemap\post_input.aspx" />
+    <Content Include="Sitemap\post_publish.aspx" />
+    <Content Include="Sitemap\post_save.aspx" />
     <Content Include="preview.aspx" />
     <Content Include="Web.config" />
   </ItemGroup>
@@ -83,12 +87,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="Web.Debug.config">
-      <DependentUpon>Web.config</DependentUpon>
-    </None>
-    <None Include="Web.Release.config">
-      <DependentUpon>Web.config</DependentUpon>
-    </None>
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
