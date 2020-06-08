@@ -1,4 +1,4 @@
-<%@ Page Language="C#" Inherits="CrownPeak.Internal.Debug.InputInit" %>
+﻿<%@ Page Language="C#" Inherits="CrownPeak.Internal.Debug.InputInit" %>
 <%@ Import Namespace="CrownPeak.CMSAPI" %>
 <%@ Import Namespace="CrownPeak.CMSAPI.Services" %>
 <%@ Import Namespace="CrownPeak.CMSAPI.CustomLibrary" %>
@@ -6,7 +6,7 @@
 <%//This plugin uses InputContext as its context class type%>
 <%
 
-    var handler = new CPContrib.SiteMap.Templates.SitemapIndex_Input();
-    handler.OnInput(asset, context);
+    var handler = new CPContrib.SiteMap.Templates.SitemapIndex_Input(asset);
+    handler.OnInput(context);
 
 %>

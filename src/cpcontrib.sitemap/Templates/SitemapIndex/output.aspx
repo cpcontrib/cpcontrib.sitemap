@@ -1,4 +1,4 @@
-<%@ Page Language="C#" Inherits="CrownPeak.Internal.Debug.OutputInit" %>
+﻿<%@ Page Language="C#" Inherits="CrownPeak.Internal.Debug.OutputInit" %>
 <%@ Import Namespace="CrownPeak.CMSAPI" %>
 <%@ Import Namespace="CrownPeak.CMSAPI.Services" %>
 <%@ Import Namespace="CrownPeak.CMSAPI.CustomLibrary" %>
@@ -6,7 +6,12 @@
 <%//This plugin uses OutputContext as its context class type%>
 <%
 
-    var template_output = new CPContrib.SiteMap.Templates.SitemapIndex_Output();
-    template_output.OnOutput(asset, context);
+	context.IsGeneratingDependencies = false;
+
+	UtilLogLogger Log = new UtilLogLogger("SitemapIndex.Output", asset);
+	Log.IsDebugEnabled = true;
+
+	var template_output = new CPContrib.SiteMap.Templates.SitemapIndex_Output(asset, Log);
+	template_output.OnOutput(context);
 
 %>

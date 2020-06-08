@@ -1,4 +1,4 @@
-<%@ Page Language="C#" Inherits="CrownPeak.Internal.Debug.InputInit" %>
+﻿<%@ Page Language="C#" Inherits="CrownPeak.Internal.Debug.InputInit" %>
 
 <%@ Import Namespace="CrownPeak.CMSAPI" %>
 <%@ Import Namespace="CrownPeak.CMSAPI.Services" %>
