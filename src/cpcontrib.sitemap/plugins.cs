@@ -43,12 +43,38 @@ namespace CPContrib.SiteMap.Templates
 
 			return _ParseOverrides(input);
 		}
+		
+		public IEnumerable<UrlMetaEntry> GetOverrides(Asset asset)
+		{
+			var input = SitemapUtils.SplitMultilineInput(asset.Raw["sm_overrides"]);
+
+			return _ParseOverrides(input);
+		}		
 
 		public IEnumerable<UrlMetaEntry> GetDefaults(PanelEntry panel)
 		{
 			var input = SitemapUtils.SplitMultilineInput(panel.Raw["sm_defaults"]);
 
 			return _ParseOverrides(input);
+		}
+		
+		public IEnumerable<UrlMetaEntry> GetDefaults(Asset asset)
+		{
+			var input = SitemapUtils.SplitMultilineInput(asset.Raw["sm_defaults"]);
+
+			return _ParseOverrides(input);
+		}		
+
+		/// <summary>
+		/// Returns asset that represents the user selection for the base path
+		/// </summary>
+		/// <returns></returns>
+		public Asset GetBasePathFolder()
+		{
+			Asset folder = Asset.Load(asset.Raw["sitemap_root"]);
+			if (folder.IsLoaded == false) folder = asset.Parent;
+
+			return folder;
 		}
 
 		internal IEnumerable<UrlMetaEntry> _ParseOverrides(IEnumerable<string> input)
@@ -88,6 +114,20 @@ namespace CPContrib.SiteMap.Templates
 
 			return regex_list;
 		}
+		
+		/// <summary>
+		/// Retrieves ignored paths from 'ignored_paths' field
+		/// </summary>
+		/// <param name="siteroot_asset"></param>
+		/// <returns></returns>
+		public IEnumerable<Regex> GetIgnoredPaths(Asset siteroot_asset)
+		{
+			var regex_list = 
+				SitemapUtils.SplitMultilineInput(siteroot_asset.Raw["ignored_paths"])
+				.Select(_ => CPContrib.SiteMap.SitemapUtils.PathspecToRegex(_)).ToArray();
+
+			return regex_list;
+		}		
 
 		/// <summary>
 		/// Input for configuring page and global-level XML sitemap options.  The resulting content fields can be crawled when creating XML sitemaps
@@ -233,6 +273,13 @@ namespace CPContrib.SiteMap.Templates
 			var templateRefs = GetTemplateRefs(input);
 			return templateRefs;
 		}
+		
+		IEnumerable<TemplateRef> GetTemplateRefs(Asset asset)
+		{
+			var input = SitemapUtils.SplitMultilineInput(asset.Raw["exclude_templates"]);
+			var templateRefs = GetTemplateRefs(input);
+			return templateRefs;
+		}
 
 		IEnumerable<TemplateRef> GetTemplateRefs(IEnumerable<string> input)
 		{
@@ -267,12 +314,12 @@ namespace CPContrib.SiteMap.Templates
 	
 	public class Sitemap_Output //Sitemap_Output: ITemplate_Output
 	{
-		public Sitemap_Output(Func<IList<UrlBuilder>> SitemapBuilderFunc)
+		public Sitemap_Output(Func<IList<SitemapItem>> SitemapBuilderFunc)
 		{
 			this.SitemapBuilderFunc = SitemapBuilderFunc;
 		}
 
-		Func<IList<UrlBuilder>> SitemapBuilderFunc;
+		Func<IList<SitemapItem>> SitemapBuilderFunc;
 
 		/// <summary>
 		/// Forces writing all urls as https
@@ -291,18 +338,20 @@ namespace CPContrib.SiteMap.Templates
 			}
 
 
-			IList<UrlBuilder> result = null;
+			IList<SitemapItem> result = null;
 
 			Stopwatch sw = new Stopwatch();
-			sw.Start();
 
-			try { result = SitemapBuilderFunc(); }
+			try 
+			{ 
+				sw.Start();
+				result = SitemapBuilderFunc(); 
+				sw.Stop();
+			}
 			catch(Exception ex)
 			{
 				throw new ApplicationException("SitemapBuilderFunc failed.", ex);
 			}
-
-			sw.Stop();
 
 			Util.Log(asset, "Last run finished {0} and lasted {1}", DateTime.UtcNow.ToString("O"), sw.Elapsed.ToString("c"));
 		}
@@ -370,7 +419,7 @@ namespace CPContrib.SiteMap.Templates
 		/// <param name="sitemapList"></param>
 		/// <param name="isPublishing"></param>
 		/// <returns></returns>
-		public string GetSitemapXmlChunk(IEnumerable<UrlBuilder> sitemapList, bool isPublishing = true)
+		public string GetSitemapXmlChunk(IEnumerable<SitemapItem> sitemapList, bool isPublishing = true)
 		{
 			var writer = new XmlTextWriter(
 				new System.Xml.XmlWriterSettings() {
@@ -416,13 +465,19 @@ namespace CPContrib.SiteMap.Templates
 					writer.WriteString(url.lastmod);
 					writer.WriteEndElement();
 
-					writer.WriteStartElement("changefreq");
-					writer.WriteString(url.changefreq);
-					writer.WriteEndElement();
+					if (string.IsNullOrEmpty(url.changefreq) == false)
+					{
+						writer.WriteStartElement("changefreq");
+						writer.WriteString(url.changefreq);
+						writer.WriteEndElement();
+					}
 
-					writer.WriteStartElement("priority");
-					writer.WriteString(url.priority);
-					writer.WriteEndElement();
+					if (string.IsNullOrEmpty(url.priority) == false)
+					{
+						writer.WriteStartElement("priority");
+						writer.WriteString(url.priority);
+						writer.WriteEndElement();
+					}
 				}
 				writer.WriteEndElement();//url
 			}
@@ -493,77 +548,107 @@ namespace CPContrib.SiteMap.Templates
 				}
 			}
 
-			//if (path[2] != asset.AssetPath[2])
-			//{
-			//    Out.DebugWriteLine("Ignoring asset '{0}' due to unexpected language mismatch: '{1}'.", currentAsset.AssetPath, asset.AssetPath[2]);
-			//    ignored = true;
-			//}
-
-			//FilterParams is returning items with empty workflow
-			if(currentAsset.WorkflowStatus.Name != context.PublishingStatus.Name)
-			{
-				Log.Debug("Ignoring asset '{0}' due to differing Workflow Status: '{1}'.", currentAsset.AssetPath, currentAsset.WorkflowStatus.Name);
-				ignored = true;
-			}
-
 			return ignored;
 		}
 
-		public IEnumerable<CPContrib.SiteMap.UrlBuilder> ProcessList(Status currentStatus)
+		public IEnumerable<CPContrib.SiteMap.SitemapItem> ProcessList(Status notused = null)
 		{
-			var sitemapList = new List<CPContrib.SiteMap.UrlBuilder>();
+			DateTime EMPTY_LAST_MOD_DATE = new DateTime(1980, 1, 1);
+
+			var sitemapList = new List<CPContrib.SiteMap.SitemapItem>();
 
 			int count = 0;
 			IEnumerable<Asset> assetList = this._assets ?? new List<Asset>();
 
+			Stopwatch sw = new Stopwatch();
+			sw.Start();
+
+			Log.Info("PublishingStatus: {0}", context.PublishingStatus.Name);
+			Log.Info("List.Count: {0}", this._assets.Count);
+
+			int ignoredCount = 0;
+
 			foreach (Asset currentAsset in assetList)
 			{
+				
 				bool ignored = this.IgnoreAssetFunc(currentAsset);
 
-				if (ignored == false)
+				Log.Debug("asset {0}: ignore func returns {1}", currentAsset.Id, ignored);
+
+				if (ignored) ignoredCount++;
+				if (currentAsset.IsLoaded==false) Log.Warn("asset {0}: isloaded={1}", currentAsset.Id, currentAsset.IsLoaded);
+
+				if (ignored == false && currentAsset.IsLoaded)
 				{
-					var url = new CPContrib.SiteMap.UrlBuilder();
+					var url = new CPContrib.SiteMap.SitemapItem();
 
 					url.Asset = currentAsset;
 
-					if(currentAsset.IsLoaded)
+					Log.Debug("asset {0}: begin processing", currentAsset.Id);
+
+					// Is this really needed? Seems to add un-needed overhead. Saving too much data to Content fields.					
+					//string link = sitemapLinkCache.GetOrUpdateCachedLink(currentAsset);
+
+					var lastPubUrls = currentAsset.GetLastPublishedLinks(true, ProtocolType.Https);
+					string link = lastPubUrls.FirstOrDefault();
+
+					//TEMP HACK
+					if (link != null && link.StartsWith("httpss://"))
 					{
-						Log.Debug("Adding asset {0}", currentAsset.Id);
-						
-						List<string> lastPubUrls = currentAsset.GetLastPublishedLinks(true, ProtocolType.Https);
-						string link = lastPubUrls.FirstOrDefault();
-						if(string.IsNullOrEmpty(link))
-							link = currentAsset.GetLink(addDomain: true, protocolType:ProtocolType.Https);
+						Log.Debug("currentAsset.Id={0} GetPublishedLinks has httpss", currentAsset.Id);
+						link = link.Replace("httpss://", "https://");
+					}
 
-						if (!string.IsNullOrEmpty(link))
+					if (string.IsNullOrEmpty(link))
+					{
+						link = currentAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
+					}
+
+					Log.Debug("asset {0}: link is '{1}'", currentAsset.Id, link);
+
+					if (!string.IsNullOrEmpty(link))
+					{
+						url.Loc = link;
+						url.LastMod = (url.Asset.ModifiedDate == null ? EMPTY_LAST_MOD_DATE : url.Asset.ModifiedDate.Value);
+
+						string assetpathStr = url.Asset.AssetPath.ToString();
+
+						var defaultEntry = GetDefaultEntry(assetpathStr);
+						var overrideEntry = GetOverrideEntry(assetpathStr);
+
+						//call function assigned to AssignPropertiesFunc
+						this.AssignMetaFunc(url, defaultEntry, overrideEntry);
+
+						if(url.changefreq == SitemapConstants.Tiered_LastMod)
 						{
-							url.Loc = link;
-							url.LastMod = url.Asset.ModifiedDate.GetValueOrDefault();
-
-							string assetpathStr = url.Asset.AssetPath.ToString();
-
-							var defaultEntry = GetDefaultEntry(assetpathStr);
-							var overrideEntry = GetOverrideEntry(assetpathStr);
-
-							//call function assigned to AssignPropertiesFunc
-							this.AssignMetaFunc(url, defaultEntry, overrideEntry);
-
-							if(url.changefreq == SitemapConstants.Tiered_LastMod)
-							{
-								this.Tiered_LastMod_ChangeFreq(url);
-							}
-
-							//add to list to output
-							sitemapList.Add(url);
+							this.Tiered_LastMod_ChangeFreq(url);
 						}
+
+						//add to list to output
+						Log.Debug("asset {0}: added to list", currentAsset.Id);
+						sitemapList.Add(url);
 					}
 				}
 			}
 
+			//sitemapLinkCache.SaveLinkCache();
+
+			sw.Stop();
+
+			Log.Info("processed {0} assets.", assetList.Count());
+			Log.Info("ignored {0} assets.", ignoredCount);
+			Log.Info("sitemap list contains {0} assets", sitemapList.Count);
+			Log.Info("ProcessList took {0} seconds", sw.Elapsed.TotalSeconds);
+
 			return sitemapList;
 		}
 
-		public void Tiered_LastMod_ChangeFreq(UrlBuilder url)
+
+		/// <summary>
+		/// Tries to write out a change frequency based on the last modified date.
+		/// </summary>
+		/// <param name="url"></param>
+		public void Tiered_LastMod_ChangeFreq(SitemapItem url)
 		{
 			DateTime now = DateTime.Today;
 			var span = now - url.LastMod;
@@ -612,8 +697,12 @@ namespace CPContrib.SiteMap.Templates
 			return null;
 		}
 
-		public Action<UrlBuilder,UrlMetaEntry,UrlMetaEntry> AssignMetaFunc;
-		public virtual void AssignMeta(UrlBuilder url, UrlMetaEntry defaultEntry, UrlMetaEntry overrideEntry)
+		/// <summary>
+		/// A function that can make adjustments to the current UrlBuilder instance
+		/// </summary>
+		public Action<SitemapItem,UrlMetaEntry,UrlMetaEntry> AssignMetaFunc;
+
+		public virtual void AssignMeta(SitemapItem url, UrlMetaEntry defaultEntry, UrlMetaEntry overrideEntry)
 		{
 			//url.priority = LmUtil.EmptyFallback(url.Asset.Raw["xmlsm_priority"], url.Asset.Raw[SitemapConstants.FieldNames.Sitemap_Priority], "");
 			url.priority = url.Asset.Raw[SitemapConstants.FieldNames.Sitemap_Priority];
@@ -659,17 +748,51 @@ namespace CPContrib.SiteMap.Templates
 	{
 		public void OnPostPublish(Asset asset, PostPublishContext context)
 		{
-			using(var Logger = new CrownPeak.CMSAPI.CustomLibrary.UtilLogLogger("SitemapsPinger", asset))
+			context.RenderPublishLinks = true;
+
+			using(var Logger = new CrownPeak.CMSAPI.CustomLibrary.UtilLogLogger("SitemapIndex.OnPostPublish", asset))
 			{
 				foreach(var panel in asset.GetPanels("sitemap_roots"))
 				{
-					Asset sitemapAsset = Asset.Load(panel.Raw["sitemap_asset"]);
-					sitemapAsset.Publish(publishDependencies: false);
+					var sitemapAssetsList = new List<Asset>();
 
-					string sitemapUrl = sitemapAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
+					if (string.IsNullOrEmpty(panel["sitemap_asset"]) == false)
+					{
+						Asset sitemapAsset = Asset.Load(panel["sitemap_asset"]);
+						if(sitemapAsset.IsLoaded==true)
+							sitemapAssetsList.Add(sitemapAsset);
+					}
 
-					var sitemapsPinger = new CPContrib.SiteMap.SitemapsPinger(Logger);
-					sitemapsPinger.Ping(sitemapUrl);
+					if (string.IsNullOrEmpty(panel["multi_sitemap_root_path"]) == false && string.IsNullOrEmpty(panel["multi_sitemap_template_id"]) == false)
+					{
+						try
+						{
+							FilterParams fp = new FilterParams();
+							fp.Add(AssetPropertyNames.TemplateId, Comparison.Equals, int.Parse(panel["multi_sitemap_template_id"]));
+
+							Asset rootfolder = Asset.Load(panel["multi_sitemap_root_path"]);
+							var foundAssets = rootfolder.GetFilterList(fp);
+
+							sitemapAssetsList.AddRange(foundAssets);
+						}
+						catch (Exception) { }
+					}
+
+					Logger.Info("sitemapAssetsList count is '{0}'.", sitemapAssetsList.Count);
+
+					foreach (var sitemapAsset in sitemapAssetsList)
+					{
+						if(sitemapAsset.IsLoaded)
+						{
+							sitemapAsset.Publish(publishDependencies: false);
+
+							string sitemapUrl = sitemapAsset.GetLink(addDomain: true, protocolType: ProtocolType.Https);
+
+							Logger.Info("Ping search engines for '{0}'.", sitemapUrl);
+							var sitemapsPinger = new CPContrib.SiteMap.SitemapsPinger(Logger);
+							sitemapsPinger.Ping(sitemapUrl);
+						}
+					}
 				}
 			} //Logger.Flush();
 		}
@@ -677,7 +800,13 @@ namespace CPContrib.SiteMap.Templates
 
 	public class SitemapIndex_Input // : ITemplate_Input
 	{
-		public void OnInput(Asset asset, InputContext context)
+		public SitemapIndex_Input(Asset asset)
+		{
+			this.asset = asset;
+		}
+		private Asset asset;
+
+		public void OnInput(InputContext context)
 		{
 			//generate control panel to contain List Panel and Checkbox in one panel in Volte
 			Input.StartTabbedPanel("Sitemap Roots", "Options");
@@ -687,7 +816,8 @@ namespace CPContrib.SiteMap.Templates
 				{
 
 					Input.ShowAcquireDocument("Included Sitemap", "sitemap_asset", helpMessage: "Select a Sitemap asset to include within the index");
-
+					Input.ShowTextBox("Multiple Sitemaps Root Path", "multi_sitemap_root_path");
+					Input.ShowTextBox("Sitemap Template Id", "multi_sitemap_template_id");
 
 				}
 			}
@@ -702,11 +832,15 @@ namespace CPContrib.SiteMap.Templates
 
 	public class SitemapIndex_Output // : ITemplate_Output
 	{
-		public SitemapIndex_Output()
+		public SitemapIndex_Output(Asset asset, CPLog.ILogger logger = null)
 		{
+			this.asset = asset;
+			if (logger != null) Log = logger;
 		}
+		CPLog.ILogger Log = new CPLog.Logger("SitemapIndex");
+		Asset asset;
 
-		public void OnOutput(Asset asset, OutputContext context)
+		public void OnOutput(OutputContext context)
 		{
 			Out.Write(ComponentOutput(asset, context));
 		}
@@ -716,6 +850,7 @@ namespace CPContrib.SiteMap.Templates
 			StringBuilder sb = new StringBuilder();
 
 			sb.AppendLine("<?xml version='1.0' encoding='UTF-8'?>");
+			sb.AppendLine(string.Format("<!-- generated {0} -->", DateTime.UtcNow.ToString("O")));
 			sb.AppendLine(@"<sitemapindex xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
 			xsi:schemaLocation='http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/siteindex.xsd'
 			xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>");
@@ -724,28 +859,54 @@ namespace CPContrib.SiteMap.Templates
 
 			foreach(var panel in asset.GetPanels("sitemap_roots"))
 			{
-				Asset sitemapAsset = Asset.Load(panel["sitemap_asset"]);
 
-				if(sitemapAsset.IsLoaded)
+				var sitemapAssetsList = new List<Asset>();
+
+				if(string.IsNullOrEmpty(panel["sitemap_asset"]) == false)
 				{
-					//create dependency to the sitemaproot asset specified
-					asset.AddDependencyTo(sitemapAsset);
-
-					sb.AppendLine("<sitemap>");
-
-					string loc = sitemapAsset.GetLink(addDomain: true);
-					if(forceHttps) loc = loc.Replace("http://", "https://");
-					sb.AppendFormat("  <loc>{0}</loc>\n", loc);
-
-					if(sitemapAsset.PublishDate != null)
-					{
-						//use W3C Datetime format, yyyy-MM-dd
-						sb.AppendFormat("  <lastmod>{0}</lastmod>\n", sitemapAsset.PublishDate.Value.ToString("yyyy-MM-dd"));
-					}
-
-					sb.AppendLine("</sitemap>");
+					Asset sitemapAsset = Asset.Load(panel["sitemap_asset"]);
+					sitemapAssetsList.Add(sitemapAsset);
 				}
 
+				if (string.IsNullOrEmpty(panel["multi_sitemap_root_path"]) == false && string.IsNullOrEmpty(panel["multi_sitemap_template_id"]) == false)
+				{
+					try
+					{
+						FilterParams fp = new FilterParams();
+						fp.Add(AssetPropertyNames.TemplateId, Comparison.Equals, int.Parse(panel["multi_sitemap_template_id"]));
+
+						Asset rootfolder = Asset.Load(panel["multi_sitemap_root_path"]);
+						var foundAssets = rootfolder.GetFilterList(fp);
+
+						sitemapAssetsList.AddRange(foundAssets);
+					}
+					catch (Exception) { }
+				}
+
+				Log.Info("sitemapAssetsList count is '{0}'.", sitemapAssetsList.Count);
+
+				foreach (var sitemapAsset in sitemapAssetsList)
+				{
+					if (sitemapAsset.IsLoaded)
+					{
+						//create dependency to the sitemaproot asset specified
+						asset.AddDependencyTo(sitemapAsset);
+
+						sb.AppendLine("<sitemap>");
+
+						string loc = sitemapAsset.GetLink(addDomain: true);
+						if (forceHttps) loc = loc.Replace("http://", "https://");
+						sb.AppendFormat("  <loc>{0}</loc>\n", loc);
+
+						if (sitemapAsset.PublishDate != null)
+						{
+							//use W3C Datetime format, yyyy-MM-dd
+							sb.AppendFormat("  <lastmod>{0}</lastmod>\n", sitemapAsset.PublishDate.Value.ToString("yyyy-MM-dd"));
+						}
+
+						sb.AppendLine("</sitemap>");
+					}
+				}
 			}
 
 			sb.AppendLine("</sitemapindex>");

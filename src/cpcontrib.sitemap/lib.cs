@@ -155,7 +155,7 @@ namespace CPContrib.SiteMap
 	using System.Runtime.Serialization;
 	using System.Text.RegularExpressions;
 
-	public class UrlBuilder
+	public class SitemapItem
 	{
 		public string Loc { get; set; }
 
@@ -503,10 +503,10 @@ namespace CPContrib.SiteMap.SearchEngines
 
 		public void Ping(string sitemapUrl)
 		{
-			string url = "http://google.com/ping?sitemap={sitemapUrl}".Replace("{sitemapUrl}", sitemapUrl);
+			string url = "https://www.google.com/ping?sitemap={sitemapUrl}".Replace("{sitemapUrl}", sitemapUrl);
 			//string url = $"http://google.com/ping?sitemap={sitemapUrl}";
 
-			Log.Debug(() => string.Format("HttpGet to '{0}'.", url));
+			//Log.Debug("HttpGet to '{0}'.", url);
 
 			Util.GetHttp(url);
 		}
@@ -533,7 +533,7 @@ namespace CPContrib.SiteMap.SearchEngines
 			string url = "http://bing.com/ping?sitemap={sitemapUrl}".Replace("{sitemapUrl}", sitemapUrl);
 			//string url = $"http://bing.com/ping?sitemap={sitemapUrl}";
 
-			Log.Debug(() => string.Format("HttpGet to '{0}'.", url));
+			//Log.Debug("HttpGet to '{0}'.", url);
 
 			Util.GetHttp(url);
 		}
